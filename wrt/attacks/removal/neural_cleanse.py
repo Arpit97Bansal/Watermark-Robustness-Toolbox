@@ -184,7 +184,9 @@ def neural_cleanse_partial_unlearning_attack(classifier, **kwargs):
 
 @mlconfig.register
 def neural_cleanse_partial_unlearning_removal(attack: NeuralCleansePartialUnlearning, train_loader, config, **kwargs):
-    train_loader_subset = config.subset_dataset(train=True)
+    #Arpit
+    train_loader_subset = config.dataset(train=True)
+    #train_loader_subset = config.subset_dataset(train=True)
     return attack, attack.remove(train_loader=train_loader, train_loader_subset=train_loader_subset, **kwargs)
 
 
@@ -307,6 +309,7 @@ class NeuralCleansePruning(RemovalAttack):
         num_clean_batches = int(np.ceil(x.shape[0] // self.batch_size))
         for batch in range(num_clean_batches):
             activation = self.classifier.get_all_activations(x[batch * self.batch_size: (batch + 1) * self.batch_size])[self.layer_index]
+            #print(len(activation))
             activation = self.classifier.functional.numpy(activation)
             clean_activations.append(np.mean(activation, axis=0))
 

@@ -17,7 +17,7 @@ create:
 remove:
   name: neural_laundering_partial_removal
   boost_factor: 1
-  epochs: 5
+  epochs: 100
 
 dataset:
   name: CIFAR10DataLoader

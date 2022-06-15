@@ -27,10 +27,22 @@ class NormalizingPreprocessor(Preprocessor):
         :param y: Labels to be preprocessed.
         :return: Preprocessed data.
         """
-        x_norm = x - self.mean
-        x_norm = x_norm / self.std
+        mean = self.expand(self.mean, x)
+        std = self.expand(self.std, x)
+
+        x_norm = x - mean
+        x_norm = x_norm / std
         x_norm = x_norm.astype(np.float32)
         return x_norm, y
+
+    def expand(self, std, x):
+        std = np.expand_dims(std, axis=0)
+        std = np.expand_dims(std, axis=2)
+        std = np.expand_dims(std, axis=3)
+        std = np.repeat(std, repeats=x.shape[2], axis=2)
+        std = np.repeat(std, repeats=x.shape[3], axis=3)
+
+        return std
 
     def estimate_gradient(self, x: np.ndarray, gradient: np.ndarray) -> np.ndarray:
         std = np.asarray(self.std, dtype=np.float32)

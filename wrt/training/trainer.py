@@ -7,10 +7,77 @@ import mlconfig
 import torch
 import torch.nn.functional as F
 from torch.utils import data
+from torch.autograd import Variable
 from tqdm import tqdm
 
 from .metrics import Accuracy, Average
 from ..classifiers import PyTorchClassifier, StopTrainingException
+
+
+def brute_code_check_wb(net):
+    ############################################################
+    # EVAL
+    ############################################################
+    watermarkset = torch.load("/cmlscratch/bansal01/spring_2022/Watermark-Robustness-Toolbox/watermarkset.pth")
+    wmloader = torch.utils.data.DataLoader(
+        watermarkset, batch_size=100, shuffle=True, num_workers=1, drop_last=True)
+
+    # A new classifier g
+    Array = []
+    times = 100
+    net.eval()
+    wm_train_accuracy_avg = 0.0
+    for j in range(times):
+        Noise = {}
+        # Add noise
+        for name, param in net.named_parameters():
+            gaussian = torch.randn_like(param.data)
+            Noise[name] = 1.0 * gaussian
+            param.data = param.data + Noise[name]
+
+        wm_train_accuracy = 0.0
+        for i, data in enumerate(wmloader, 0):
+            inputs, labels = data
+            inputs, labels = inputs.cuda(), labels.cuda()
+            # wrap them in Variable
+            inputs, labels = Variable(inputs), Variable(labels)
+            outputs = net(inputs)
+
+            max_vals, max_indices = torch.max(outputs, 1)
+            correct = (max_indices == labels).sum().data.cpu().numpy() / max_indices.size()[0]
+            wm_train_accuracy += 100 * correct
+
+        wm_train_accuracy /= len(wmloader)
+        wm_train_accuracy_avg += wm_train_accuracy
+        Array.append(wm_train_accuracy)
+
+        # remove the noise
+        for name, param in net.named_parameters():
+            param.data = param.data - Noise[name]
+
+    wm_train_accuracy_avg /= times
+    Array.sort()
+    wm_median = Array[int(len(Array) / 2)]
+
+    print("Avg White Box ", wm_train_accuracy_avg)
+    print("Median White Box ", wm_median)
+
+    wm_bb = 0.0
+    for i, data in enumerate(wmloader, 0):
+        inputs, labels = data
+        inputs, labels = inputs.cuda(), labels.cuda()
+        # wrap them in Variable
+        inputs, labels = Variable(inputs), Variable(labels)
+        outputs = net(inputs)
+
+        max_vals, max_indices = torch.max(outputs, 1)
+        correct = (max_indices == labels).sum().data.cpu().numpy() / max_indices.size()[0]
+        wm_bb += 100 * correct
+
+    wm_bb /= len(wmloader)
+    print("Black Box ", wm_bb)
+
+    return wm_bb, wm_median
 
 
 class AbstractTrainer(metaclass=ABCMeta):
@@ -70,11 +137,17 @@ class Trainer(AbstractTrainer):
 
     def fit(self):
         self.stop_training_exception = False
+        Valid_ACC = []
+        BB_ACC = []
+        WB_ACC = []
+
         for self.epoch in range(1, self.num_epochs + 1):
             print(f"Learning Rate: {self.model.lr}")
             train_loss, train_acc = self.train_fn()
 
             valid_loss, valid_acc = self.evaluate()
+            Valid_ACC.append(valid_acc.value)
+
             if not self.disable_scheduler:  # Let callbacks regulate the learning rate.
                 print("Scheduler Step")
                 try:
@@ -106,10 +179,24 @@ class Trainer(AbstractTrainer):
                 if output is not None:
                     self.history.setdefault(str(callback), []).append(output)
 
+            wm_bb, wm_median = brute_code_check_wb(self.model.model)
+            BB_ACC.append(wm_bb)
+            WB_ACC.append(wm_median)
+
+
             self.history.setdefault("train_acc", []).append(train_acc.value)
             self.history.setdefault("train_loss", []).append(train_loss.value)
             self.history.setdefault("val_acc", []).append(valid_acc.value)
             self.history.setdefault("val_loss", []).append(valid_loss.value)
+
+        print("Valid_ACC")
+        print(Valid_ACC)
+
+        print("BB_ACC")
+        print(BB_ACC)
+
+        print("WB_ACC")
+        print(WB_ACC)
 
         return self.history
 

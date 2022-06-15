@@ -12,4 +12,5 @@ from .frontier_stitching import FrontierStitching
 from .jia import Jia
 from .uchida import Uchida
 from .zhang import ZhangContent, ZhangUnrelated, ZhangNoise
+from .my_text_overlay import Text_overlay
 

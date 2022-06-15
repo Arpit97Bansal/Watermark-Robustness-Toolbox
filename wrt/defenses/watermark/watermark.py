@@ -127,8 +127,8 @@ class Watermark(abc.ABC):
         raise NotImplementedError
 
     def verify(self,
-               x: np.ndarray,
-               y: np.ndarray = None,
+               x,
+               y,
                classifier: PyTorchClassifier = None,
                **kwargs) -> Tuple[float, bool]:
         """ Verifies whether the given classifier retains the watermark. Returns the watermark
@@ -145,6 +145,7 @@ class Watermark(abc.ABC):
 
         classifier.model.eval()
         msg = self.extract(x, classifier=classifier, **kwargs)
+        y = y.cpu().detach().numpy()
         wm_acc = compute_accuracy(msg, y)
 
         return wm_acc, wm_acc > 0  # ToDo: Implement decision boundary as a second parameter

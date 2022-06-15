@@ -10,7 +10,8 @@ from torchvision.datasets.utils import download_and_extract_archive
 from torchvision.transforms import Normalize, Compose
 from tqdm import tqdm
 from PIL import Image
-
+from torch.utils.data import Subset
+import torchvision
 from wrt.classifiers import PyTorchClassifier
 from wrt.training.datasets.wrt_data_loader import WRTDataLoader
 
@@ -82,8 +83,9 @@ class CIFAR10AveragingStolenDataset(data.Dataset):
         self.batch_size = batch_size
         self.num_workers = num_workers
 
-        mean, std = _normalize(True)
-        normalize = transforms.Normalize(mean=mean.squeeze(), std=std.squeeze())
+        self.mean, self.std = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+        normalize = transforms.Normalize(mean=self.mean, std=self.std)
+
         if transform is None:
             transform = transforms.Compose([
                 # transforms.ToPILImage(),
@@ -188,38 +190,96 @@ class CIFAR10StolenDataset(data.Dataset):
                     preds = np.argmax(batch_y.numpy(), axis=1)
                     accs.append(len(np.where(preds == y.numpy())[0]) / preds.shape[0])
                     pbar.set_description(f"Stolen Labels ({100 * np.mean(accs):.4f}% Accuracy)")
+#
+#
+# def _normalize(apply_normalization):
+#     if apply_normalization:
+#         mean = np.array([0.4914, 0.4822, 0.4465]).reshape((1, 3, 1, 1))
+#         std = np.array([0.247, 0.243, 0.261]).reshape((1, 3, 1, 1))
+#         return mean, std
+#     return np.array([0, 0, 0]).reshape((1, 3, 1, 1)), np.array([1, 1, 1]).reshape((1, 3, 1, 1))
+#
+#
+# def _augment(apply_augmentation: bool, train: bool, image_size: int, normalize: Normalize) -> Compose:
+#     if apply_augmentation:
+#         if train:
+#             return transforms.Compose([
+#                 transforms.RandomCrop(image_size, padding=4),
+#                 transforms.RandomHorizontalFlip(),
+#                 transforms.ToTensor(),
+#                 normalize,
+#             ])
+#         else:
+#             return transforms.Compose([
+#                 # transforms.Resize(int(image_size * 256 / 224)),
+#                 # transforms.CenterCrop(image_size),
+#                 transforms.Resize(image_size),
+#                 transforms.ToTensor(),
+#                 normalize,
+#             ])
+#     return transforms.Compose([
+#         transforms.Resize(image_size),
+#         transforms.ToTensor(),
+#         normalize,
+#     ])
 
 
-def _normalize(apply_normalization):
-    if apply_normalization:
-        mean = np.array([0.4914, 0.4822, 0.4465]).reshape((1, 3, 1, 1))
-        std = np.array([0.247, 0.243, 0.261]).reshape((1, 3, 1, 1))
-        return mean, std
-    return np.array([0, 0, 0]).reshape((1, 3, 1, 1)), np.array([1, 1, 1]).reshape((1, 3, 1, 1))
-
-
-def _augment(apply_augmentation: bool, train: bool, image_size: int, normalize: Normalize) -> Compose:
-    if apply_augmentation:
-        if train:
-            return transforms.Compose([
-                transforms.RandomCrop(image_size, padding=4),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                normalize,
-            ])
-        else:
-            return transforms.Compose([
-                # transforms.Resize(int(image_size * 256 / 224)),
-                # transforms.CenterCrop(image_size),
-                transforms.Resize(image_size),
-                transforms.ToTensor(),
-                normalize,
-            ])
-    return transforms.Compose([
-        transforms.Resize(image_size),
-        transforms.ToTensor(),
-        normalize,
-    ])
+# @mlconfig.register
+# class CIFAR10DataLoader(WRTDataLoader):
+#     def __init__(self, root: str, image_size: int, train: bool, batch_size: int, shuffle: bool = True,
+#                  apply_augmentation=True, subset="all", n_test=np.inf, n_train=np.inf, num_workers=2,
+#                  apply_normalization=True, apply_softmax=True, source_model=None, class_labels=None, download: bool = True,
+#                  query_labels_n_times: int = 1, top_k=None, **kwargs):
+#
+#         self.mean, self.std = _normalize(apply_normalization and query_labels_n_times <= 1)
+#         normalize = transforms.Normalize(mean=self.mean.squeeze(), std=self.std.squeeze())
+#
+#         if (source_model is not None) and train:
+#             # Predict stolen labels for the training data without augmentation.
+#             transform: Compose = _augment(apply_augmentation=False,
+#                                           train=train,
+#                                           image_size=image_size,
+#                                           normalize=normalize)
+#             predict_dataset = datasets.CIFAR10(root, train=train, transform=transform, download=download)
+#             predict_dataset = CIFAR10ShuffledSubset(dataset=predict_dataset, mode=subset, n_max=n_train)
+#
+#             augmented_dataset = predict_dataset
+#             if apply_augmentation:
+#                 # Load images with augmentation during training (if desired)
+#                 transform: Compose = _augment(apply_augmentation=apply_augmentation,
+#                                               train=train,
+#                                               image_size=image_size,
+#                                               normalize=normalize)
+#                 augmented_dataset = datasets.CIFAR10(root, train=train, transform=transform, download=download)
+#                 augmented_dataset = CIFAR10ShuffledSubset(dataset=augmented_dataset, mode=subset, n_max=n_train)
+#
+#             if query_labels_n_times > 1:
+#                 dataset = CIFAR10AveragingStolenDataset(source_model=source_model,
+#                                                         predict_dataset=predict_dataset,
+#                                                         augmented_dataset=augmented_dataset,
+#                                                         batch_size=batch_size,
+#                                                         num_workers=num_workers,
+#                                                         top_k=top_k,
+#                                                         query_labels_n_times=query_labels_n_times)
+#             else:
+#                 dataset = CIFAR10StolenDataset(source_model=source_model,
+#                                                predict_dataset=predict_dataset,
+#                                                augmented_dataset=augmented_dataset,
+#                                                batch_size=batch_size,
+#                                                top_k=top_k,
+#                                                apply_softmax=apply_softmax,
+#                                                num_workers=num_workers)
+#         else:
+#             # No stolen labels.
+#             transform: Compose = _augment(apply_augmentation, train, image_size, normalize)
+#             dataset = datasets.CIFAR10(root, train=train, transform=transform, download=download)
+#             if train:
+#                 dataset = CIFAR10ShuffledSubset(dataset=dataset, mode=subset, n_max=n_train)
+#             else:
+#                 dataset = CIFAR10ShuffledSubset(dataset=dataset, mode="all", n_max=n_test)
+#
+#         super(CIFAR10DataLoader, self).__init__(dataset=dataset, batch_size=batch_size, shuffle=shuffle,
+#                                                 num_workers=num_workers, mean=self.mean, std=self.std, **kwargs)
 
 
 @mlconfig.register
@@ -229,27 +289,43 @@ class CIFAR10DataLoader(WRTDataLoader):
                  apply_normalization=True, apply_softmax=True, source_model=None, class_labels=None, download: bool = True,
                  query_labels_n_times: int = 1, top_k=None, **kwargs):
 
-        self.mean, self.std = _normalize(apply_normalization and query_labels_n_times <= 1)
-        normalize = transforms.Normalize(mean=self.mean.squeeze(), std=self.std.squeeze())
+        self.mean, self.std = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+        normalize = transforms.Normalize(mean=self.mean, std=self.std)
+        print("Did I come here ?")
 
         if (source_model is not None) and train:
             # Predict stolen labels for the training data without augmentation.
-            transform: Compose = _augment(apply_augmentation=False,
-                                          train=train,
-                                          image_size=image_size,
-                                          normalize=normalize)
-            predict_dataset = datasets.CIFAR10(root, train=train, transform=transform, download=download)
-            predict_dataset = CIFAR10ShuffledSubset(dataset=predict_dataset, mode=subset, n_max=n_train)
 
-            augmented_dataset = predict_dataset
-            if apply_augmentation:
-                # Load images with augmentation during training (if desired)
-                transform: Compose = _augment(apply_augmentation=apply_augmentation,
-                                              train=train,
-                                              image_size=image_size,
-                                              normalize=normalize)
-                augmented_dataset = datasets.CIFAR10(root, train=train, transform=transform, download=download)
-                augmented_dataset = CIFAR10ShuffledSubset(dataset=augmented_dataset, mode=subset, n_max=n_train)
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ])
+            predict_dataset = torchvision.datasets.CIFAR10(
+                root='./data', train=True, download=True, transform=transform)
+
+            if subset == "defender":
+                predict_dataset = Subset(predict_dataset, list(range(len(predict_dataset) // 2)))
+            elif subset == "attacker":
+                predict_dataset = Subset(predict_dataset, list(range(len(predict_dataset) // 2, len(predict_dataset))))
+
+
+
+            transform_train = transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ])
+
+            trainset = torchvision.datasets.CIFAR10(
+                root='./data', train=True, download=True, transform=transform_train)
+
+            if subset == "defender":
+                trainset = Subset(trainset, list(range(len(trainset) // 2)))
+            elif subset == "attacker":
+                trainset = Subset(trainset, list(range(len(trainset) // 2, len(trainset))))
+
+            augmented_dataset = trainset
 
             if query_labels_n_times > 1:
                 dataset = CIFAR10AveragingStolenDataset(source_model=source_model,
@@ -269,16 +345,31 @@ class CIFAR10DataLoader(WRTDataLoader):
                                                num_workers=num_workers)
         else:
             # No stolen labels.
-            transform: Compose = _augment(apply_augmentation, train, image_size, normalize)
-            dataset = datasets.CIFAR10(root, train=train, transform=transform, download=download)
             if train:
-                dataset = CIFAR10ShuffledSubset(dataset=dataset, mode=subset, n_max=n_train)
+                transform = transforms.Compose([
+                    transforms.RandomCrop(32, padding=4),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                ])
             else:
-                dataset = CIFAR10ShuffledSubset(dataset=dataset, mode="all", n_max=n_test)
+                transform = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                ])
+
+            dataset = torchvision.datasets.CIFAR10(
+                root='./data', train=train, download=True, transform=transform)
+
+            if train:
+                if subset == "defender":
+                    dataset = Subset(dataset, list(range(len(dataset) // 2)))
+                elif subset == "attacker":
+                    dataset = Subset(dataset, list(range(len(dataset) // 2, len(dataset))))
+
 
         super(CIFAR10DataLoader, self).__init__(dataset=dataset, batch_size=batch_size, shuffle=shuffle,
                                                 num_workers=num_workers, mean=self.mean, std=self.std, **kwargs)
-
 
 class CIFAR10Extended(datasets.ImageFolder):
     url = "https://www.dropbox.com/s/aom04ukmra5bcrk/cifar_extended.zip?dl=1"

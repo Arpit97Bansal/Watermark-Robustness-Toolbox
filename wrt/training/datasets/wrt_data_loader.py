@@ -84,7 +84,7 @@ class WRTDataLoader(data.DataLoader):
             print("[INFO] No transformation given .. adding normalization. ")
             self.transform = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize(mean=self.mean.squeeze(), std=self.std.squeeze())
+                transforms.Normalize(mean=self.mean, std=self.std)
             ])
 
         super().__init__(dataset, batch_size=batch_size, **kwargs)
@@ -92,13 +92,35 @@ class WRTDataLoader(data.DataLoader):
     def normalize(self, x: np.ndarray):
         """ Takes a numpy array x and normalizes it
         """
-        x_norm = (x-self.mean)/self.std
+
+        std = np.asarray(self.std)
+        mean = np.asarray(self.mean)
+
+        std = self.expand(std, x)
+        mean = self.expand(mean, x)
+
+        x_norm = (x-mean)/std
         return x_norm.astype(np.float32)
+
+    def expand(self, std, x):
+        std = np.expand_dims(std, axis=0)
+        std = np.expand_dims(std, axis=2)
+        std = np.expand_dims(std, axis=3)
+        std = np.repeat(std, repeats=x.shape[2], axis=2)
+        std = np.repeat(std, repeats=x.shape[3], axis=3)
+
+        return std
 
     def unnormalize(self, x: np.ndarray):
         """ Takes a numpy array x and unnormalizes it
         """
-        return (x * self.std) + self.mean
+        std = np.asarray(self.std)
+        mean = np.asarray(self.mean)
+
+        std = self.expand(std, x)
+        mean = self.expand(mean, x)
+
+        return (x * std) + mean
 
     def split(self, splits: int) -> List:
         """ Splits a dataset into non-overlapping subsets

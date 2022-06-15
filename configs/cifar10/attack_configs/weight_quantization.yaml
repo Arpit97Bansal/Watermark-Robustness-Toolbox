@@ -3,7 +3,7 @@ create:
 
 remove:
   name: weight_quantization_removal
-  epochs: 1
+  epochs: 100
   bits: 5
 dataset:
   name: CIFAR10DataLoader

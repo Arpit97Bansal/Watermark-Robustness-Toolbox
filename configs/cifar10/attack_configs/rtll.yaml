@@ -4,7 +4,7 @@ create:
 
 remove:
   name: rtll_removal
-  epochs: 10
+  epochs: 100
 
 dataset:
   name: CIFAR10DataLoader

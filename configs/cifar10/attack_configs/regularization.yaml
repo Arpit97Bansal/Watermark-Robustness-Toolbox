@@ -7,7 +7,7 @@ remove:
   name: regularization_removal
   l2_decay: 0.1
   reg_epochs: 5
-  max_ft_epochs: 50
+  max_ft_epochs: 100
   ft_patience: 5
 
 dataset:

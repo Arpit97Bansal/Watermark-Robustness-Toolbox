@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="083a8a39-26ac-4717-b2e7-5753413db4b5" name="cmlsub00.umiacs.umd.edu">
+        <fileTransfer rootFolder="/cmlscratch/bansal01/spring_2022/" accessType="SFTP" host="cmlsub00.umiacs.umd.edu" port="22" sshConfigId="b68570bc-6eac-4550-bbe5-3129db05fb05" sshConfig="bansal01@cmlsub00.umiacs.umd.edu:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

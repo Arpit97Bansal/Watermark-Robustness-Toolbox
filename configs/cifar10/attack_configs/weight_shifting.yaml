@@ -3,7 +3,7 @@ create:
 
 remove:
   name: weight_shifting_removal
-  epochs: 10
+  epochs: 100
   lmbda: 1.5
   check_every_n_batches: 200
 

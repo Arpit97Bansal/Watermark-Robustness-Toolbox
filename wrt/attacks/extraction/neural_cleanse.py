@@ -15,6 +15,7 @@ from wrt.classifiers import PyTorchClassifier
 from wrt.config import WRT_NUMPY_DTYPE
 import torch.optim as optim
 from torch.autograd import Variable
+import torch
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ class NeuralCleanse(ExtractionAttack):
         trigger = Variable(functional.tensor(np.copy(trigger_init)))
         mask.requires_grad = True
         trigger.requires_grad = True
-        optimizer = optim.Adam([mask, trigger], lr=0.1, betas=(0.5, 0.9))
+        optimizer = optim.Adam([mask, trigger], lr=0.001, betas=(0.5, 0.9))
 
         # If source_index is specified, only find the minimum trigger to mis-classify
         # data of the source class into the target class. Otherwise, find the minimum
@@ -166,6 +167,16 @@ class NeuralCleanse(ExtractionAttack):
 
             train_loop = tqdm(range(num_batches))
             for batch in train_loop:
+                #self.classifier.model will be added noise
+                #Arpit
+                import torch
+                Noise = {}
+                # Add noise
+                for name, param in self.classifier.model.named_parameters():
+                    gaussian = torch.randn_like(param.data)
+                    Noise[name] = 1.0 * gaussian
+                    param.data = param.data + Noise[name]
+
                 x_batch = functional.tensor(x[ind[batch * self.batch_size: (batch + 1) * self.batch_size]])
                 y_batch = functional.tensor(np.tile(target_index, x_batch.shape[0]).astype(np.int64))
 
@@ -187,6 +198,12 @@ class NeuralCleanse(ExtractionAttack):
                 else:
                     description = f"Label {source_index} -> {target_index}: ({e + 1}/{epochs}): Loss ({loss:.4f}) Mask Norm ({mask_norm:.4f})"
                 train_loop.set_description(description)
+
+                # self.classifier.model remove noise
+                # Arpit
+                # remove the noise
+                for name, param in self.classifier.model.named_parameters():
+                    param.data = param.data - Noise[name]
 
         # Unfreeze the classifier.
         for param in self.classifier.model.parameters():

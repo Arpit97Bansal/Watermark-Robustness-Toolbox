@@ -487,5 +487,7 @@ def neural_laundering_attack(classifier, dataset, **kwargs):
 
 @mlconfig.register
 def neural_laundering_partial_removal(attack: Laundering, train_loader, config, **kwargs):
-    train_loader_subset = config.subset_dataset(train=True)
+    # Arpit
+    train_loader_subset = config.dataset(train=True)
+    # train_loader_subset = config.subset_dataset(train=True)
     return attack, attack.remove(train_loader=train_loader, train_loader_subset=train_loader_subset, **kwargs)
